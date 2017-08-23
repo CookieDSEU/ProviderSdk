@@ -47,6 +47,7 @@
     <DocumentationFile>output\v40\Release\bin\NipkgProvider.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="RequestHelper.cs" />
     <Compile Include="Sdk\Constants.cs" />
     <Compile Include="Sdk\ErrorCategory.cs" />
     <Compile Include="Sdk\Request.cs" />
