@@ -7,13 +7,12 @@
 param(
     # If specified, force to use the output in a specific build folder
     [string]$build = '',
-    [string]$providerName = 'NipkgProvider',
+    [string]$providerName = 'nipkg',
     # How many levels UP to check for output folders (defaults to 2)
     $depth = 2
 )
 
-Push-Location $PSScriptRoot
-﻿
+Push-Location $PSScriptRoot﻿
 
 while($depth-- -gt 0) {
     Write-Verbose "Searching '$pwd' for '${providerName}.dll'"

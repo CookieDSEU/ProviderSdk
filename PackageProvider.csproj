@@ -56,7 +56,7 @@
       <DependentUpon>Messages.resx</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="PackageProvider.cs" />
+    <Compile Include="NipkgPackageProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\Messages.resx">
@@ -66,6 +66,9 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp">
+    </Reference>
+    <Reference Include="NationalInstruments.PackageManagement.Core">
+      <HintPath>.\NationalInstruments.PackageManagement.Core.dll</HintPath>
     </Reference>
     <Reference Include="System">
     </Reference>
