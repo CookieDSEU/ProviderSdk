@@ -16,9 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using NationalInstruments.PackageManagement.Core;
 using PackageManagement.Sdk;
 using Constants = PackageManagement.Sdk.Constants;
@@ -69,28 +67,18 @@ namespace PackageManagement
         /// <returns>The version of this provider </returns>
         public string ProviderVersion
         {
-            get
-            {
-                return "1.0.0.0";
-            }
+            get { return "1.0.0.0"; }
+        }
+
+        private int ActivityID
+        {
+            get { return 0xEE; }
         }
 
         /// <summary>
         /// Gets or sets the Package Manager instance.
         /// </summary>
         public PackageManager PackageManager { get; set; }
-
-        /// <summary>
-        /// Gets a working folder for the test to use to create files and subdirectories.
-        /// </summary>
-        /// <returns>The path to the working folder.</returns>
-        public string WorkingFolder
-        {
-            get
-            {
-                return Directory.GetCurrentDirectory();
-            }
-        }
 
         /// <summary>
         /// This is just here as to give us some possibility of knowing when an unexception happens...
@@ -259,7 +247,6 @@ namespace PackageManagement
             };
             ClientLibraryRequest clientLibraryRequest = PackageManager.GetAvailablePackages(sources);
             clientLibraryRequest.WaitUntilRequestCompletes();
-
             foreach (var package in availablePackages.Where(package => package.GetDisplayName(CultureInfo.CurrentCulture).ToLower() == name.ToLower() || name.Equals(string.Empty)))
             {
                 request.YieldSoftwareIdentity(package);
@@ -267,40 +254,40 @@ namespace PackageManagement
         }
 
         /*
-                /// <summary>
-                /// Finds packages given a locally-accessible filename
-                ///
-                /// Package information must be returned using <c>request.YieldPackage(...)</c> function.
-                /// </summary>
-                /// <param name="file">the full path to the file to determine if it is a package</param>
-                /// <param name="id">if this is greater than zero (and the number should have been generated using <c>StartFind(...)</c>, the core is calling this multiple times to do a batch search request. The operation can be delayed until <c>CompleteFind(...)</c> is called</param>
-                /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
-                public void FindPackageByFile(string file, int id, Request request)
-                {
-                    // Nice-to-have put a debug message in that tells what's going on.
-                    request.Debug("Calling '{0}::FindPackageByFile' '{1}','{2}'", PackageProviderName, file, id);
+        /// <summary>
+        /// Finds packages given a locally-accessible filename
+        ///
+        /// Package information must be returned using <c>request.YieldPackage(...)</c> function.
+        /// </summary>
+        /// <param name="file">the full path to the file to determine if it is a package</param>
+        /// <param name="id">if this is greater than zero (and the number should have been generated using <c>StartFind(...)</c>, the core is calling this multiple times to do a batch search request. The operation can be delayed until <c>CompleteFind(...)</c> is called</param>
+        /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
+        public void FindPackageByFile(string file, int id, Request request)
+        {
+            // Nice-to-have put a debug message in that tells what's going on.
+            request.Debug("Calling '{0}::FindPackageByFile' '{1}','{2}'", PackageProviderName, file, id);
 
-                    // todo: find a package by file
-                }
+            // todo: find a package by file
+        }
 
-                /// <summary>
-                /// Finds packages given a URI.
-                ///
-                /// The function is responsible for downloading any content required to make this work
-                ///
-                /// Package information must be returned using <c>request.YieldPackage(...)</c> function.
-                /// </summary>
-                /// <param name="uri">the URI the client requesting a package for.</param>
-                /// <param name="id">if this is greater than zero (and the number should have been generated using <c>StartFind(...)</c>, the core is calling this multiple times to do a batch search request. The operation can be delayed until <c>CompleteFind(...)</c> is called</param>
-                /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
-                public void FindPackageByUri(Uri uri, int id, Request request)
-                {
-                    // Nice-to-have put a debug message in that tells what's going on.
-                    request.Debug("Calling '{0}::FindPackageByUri' '{1}','{2}'", PackageProviderName, uri, id);
+        /// <summary>
+        /// Finds packages given a URI.
+        ///
+        /// The function is responsible for downloading any content required to make this work
+        ///
+        /// Package information must be returned using <c>request.YieldPackage(...)</c> function.
+        /// </summary>
+        /// <param name="uri">the URI the client requesting a package for.</param>
+        /// <param name="id">if this is greater than zero (and the number should have been generated using <c>StartFind(...)</c>, the core is calling this multiple times to do a batch search request. The operation can be delayed until <c>CompleteFind(...)</c> is called</param>
+        /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
+        public void FindPackageByUri(Uri uri, int id, Request request)
+        {
+            // Nice-to-have put a debug message in that tells what's going on.
+            request.Debug("Calling '{0}::FindPackageByUri' '{1}','{2}'", PackageProviderName, uri, id);
 
-                    // todo: find a package by uri
-                }
-                        */
+            // todo: find a package by uri
+        }
+        */
 
         /// <summary>
         /// Downloads a remote package file to a local location.
@@ -312,22 +299,31 @@ namespace PackageManagement
         {
             // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::DownloadPackage' '{1}','{2}'", PackageProviderName, fastPackageReference, location);
-
+            var parts = fastPackageReference.Split(RequestHelper.NullChar);
+            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
             try
             {
+                PackageManager.RequestMadeProgress += (sender, args) =>
+                {
+                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Downloading...");
+                };
                 ClientLibraryRequest clientLibraryRequest = PackageManager.DownloadPackage(
-                    new List<string>()
-                    {
-                        fastPackageReference.Split(RequestHelper.NullChar)[0]
-                    },
+                    new List<string>() { parts[0] },
                     location);
-
                 clientLibraryRequest.WaitUntilRequestCompletes();
-
-                request.Debug(clientLibraryRequest.GetErrorInfo().Message + clientLibraryRequest.IsCompleted);
+                request.CompleteProgress(activityID, true);
+                request.YieldSoftwareIdentity(
+                    fastPackageReference,
+                    parts[0],
+                    parts[1],
+                    "MultiPartNumeric",
+                    parts[2],
+                    "ni.com",
+                    parts[0], "", "");
             }
             catch (NIPkgException e)
             {
+                request.CompleteProgress(activityID, false);
                 request.Debug(e.Message);
             }
         }
@@ -339,14 +335,19 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void InstallPackage(string fastPackageReference, Request request)
         {
+            // Nice-to-have put a debug message in that tells what's going on.
+            request.Debug("Calling '{0}::InstallPackage' '{1}'", PackageProviderName, fastPackageReference);
+            var parts = fastPackageReference.Split(RequestHelper.NullChar);
+            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
             try
             {
-                // Nice-to-have put a debug message in that tells what's going on.
-                request.Debug("Calling '{0}::InstallPackage' '{1}'", PackageProviderName, fastPackageReference);
-                var parts = fastPackageReference.Split(RequestHelper.NullChar);
-
-                ClientLibraryRequest clientLibraryRequest = PackageManager.InstallPackages(new List<string>() { parts[0] }, NIPkgTransactionFlag.GuiMode|NIPkgTransactionFlag.InteractiveMode);
+                PackageManager.RequestMadeProgress += (sender, args) =>
+                {
+                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Installing...");
+                };
+                ClientLibraryRequest clientLibraryRequest = PackageManager.InstallPackages(new List<string>() { parts[0] }, NIPkgTransactionFlag.AcceptLicenses);
                 clientLibraryRequest.WaitUntilRequestCompletes();
+                request.CompleteProgress(activityID, true);
                 request.YieldSoftwareIdentity(
                     fastPackageReference,
                     parts[0],
@@ -355,10 +356,10 @@ namespace PackageManagement
                     parts[2],
                     "ni.com",
                     parts[0], "", "");
-                request.Debug(clientLibraryRequest.GetErrorInfo().Message + clientLibraryRequest.IsCompleted);
             }
             catch (NIPkgException e)
             {
+                request.CompleteProgress(activityID, false);
                 request.Debug(e.Message);
             }
         }
@@ -372,20 +373,31 @@ namespace PackageManagement
         {
             // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::UninstallPackage' '{1}'", PackageProviderName, fastPackageReference);
-
             var parts = fastPackageReference.Split(RequestHelper.NullChar);
-
-            ClientLibraryRequest clientLibraryRequest = PackageManager.RemovePackages(new List<string>() { parts[0] });
-            clientLibraryRequest.WaitUntilRequestCompletes();
-            request.YieldSoftwareIdentity(
-                fastPackageReference,
-                parts[0],
-                parts[1],
-                "MultiPartNumeric",
-                parts[2],
-                "ni.com",
-                parts[0], "", "");
-            request.Debug(clientLibraryRequest.GetErrorInfo().Message + clientLibraryRequest.IsCompleted);
+            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
+            try
+            {
+                PackageManager.RequestMadeProgress += (sender, args) =>
+                {
+                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Uninstalling...");
+                };
+                ClientLibraryRequest clientLibraryRequest = PackageManager.RemovePackages(new List<string>() { parts[0] }, NIPkgTransactionFlag.AcceptLicenses);
+                clientLibraryRequest.WaitUntilRequestCompletes();
+                request.CompleteProgress(activityID, true);
+                request.YieldSoftwareIdentity(
+                    fastPackageReference,
+                    parts[0],
+                    parts[1],
+                    "MultiPartNumeric",
+                    parts[2],
+                    "ni.com",
+                    parts[0], "", "");
+            }
+            catch (NIPkgException e)
+            {
+                request.CompleteProgress(activityID, false);
+                request.Debug(e.Message);
+            }
         }
 
         /// <summary>
@@ -414,7 +426,6 @@ namespace PackageManagement
             };
             ClientLibraryRequest clientLibraryRequest = PackageManager.GetInstalledPackages();
             clientLibraryRequest.WaitUntilRequestCompletes();
-
             foreach (var package in installedPackages)
             {
                 request.YieldSoftwareIdentity(package);
@@ -431,7 +442,6 @@ namespace PackageManagement
             };
             ClientLibraryRequest clientLibraryRequest = PackageManager.GetFeedConfigurations();
             clientLibraryRequest.WaitUntilRequestCompletes();
-
             if (names.Any())
             {
                 // the system is requesting sources that match the values passed.

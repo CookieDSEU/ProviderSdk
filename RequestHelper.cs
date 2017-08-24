@@ -15,7 +15,7 @@ namespace PackageManagement
         {
             var fastPath = string.Join(
                 NullString,
-                package.GetDisplayName(CultureInfo.CurrentCulture),
+                package.PackageName,
                 package.GetDisplayVersion(CultureInfo.CurrentCulture),
                 package.GetDescription(CultureInfo.CurrentCulture));
 
