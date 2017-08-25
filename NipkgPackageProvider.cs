@@ -95,6 +95,11 @@ namespace PackageManagement
                 PackageManager = new PackageManager();
                 PackageManager.InitializeSession(GetType().Assembly.GetName().Name, GetType().Assembly.GetName().Version.ToString());
                 SetConfiguration("nipkg.disablefileagent", "false");
+                foreach (var feed in GetSource(request.Sources.ToArray()))
+                {
+                    ClientLibraryRequest clientLibraryRequest = PackageManager.UpdateFeed(feed);
+                    clientLibraryRequest.WaitUntilRequestCompletes();
+                }
             }
             catch (NIPkgException e)
             {
@@ -208,8 +213,10 @@ namespace PackageManagement
 
             try
             {
-                ClientLibraryRequest clientLibraryRequest = PackageManager.AddFeedConfiguration(location, name.ToLower());
-                clientLibraryRequest.WaitUntilRequestCompletes();
+                ClientLibraryRequest addFeedRequest = PackageManager.AddFeedConfiguration(location, name.ToLower());
+                addFeedRequest.WaitUntilRequestCompletes();
+                ClientLibraryRequest updateFeedRequest = PackageManager.UpdateFeed(name.ToLower());
+                updateFeedRequest.WaitUntilRequestCompletes();
             }
             catch (NIPkgException e)
             {
