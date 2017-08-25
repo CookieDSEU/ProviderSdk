@@ -21,7 +21,7 @@ namespace PackageManagement
 
             return request.YieldSoftwareIdentity(
                 fastPath, // this should be what we need to figure out how to find the package again
-                package.GetDisplayName(CultureInfo.CurrentCulture), // this is the friendly name of the package
+                package.PackageName, // this is the friendly name of the package
                 package.GetDisplayVersion(CultureInfo.CurrentCulture), "MultiPartNumeric", // the version and version scheme
                 package.GetDescription(CultureInfo.CurrentCulture),
                 package.FeedName,

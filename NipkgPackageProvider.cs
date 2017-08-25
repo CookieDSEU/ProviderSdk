@@ -40,7 +40,7 @@ namespace PackageManagement
         /// </summary>
         protected static Dictionary<string, string[]> Features = new Dictionary<string, string[]> {
             // specify the extensions that your provider uses for its package files (if you have any)
-            { Constants.Features.SupportedExtensions, new[]{"nipkg"}},
+            { Constants.Features.SupportedExtensions, new[]{NipkgConstants.NipkgFileExtension}},
 
             // you can list the URL schemes that you support searching for packages with
             { Constants.Features.SupportedSchemes, new [] {"http", "https", "file"}},
@@ -50,15 +50,13 @@ namespace PackageManagement
             { Constants.Features.MagicSignatures, Constants.Signatures.ZipVariants},
         };
 
-        //private PackageManager _packageManager = new PackageManager();
-
         /// <summary>
         /// Returns the name of the Provider.
         /// </summary>
         /// <returns>The name of this provider </returns>
         public string PackageProviderName
         {
-            get { return "nipkg"; }
+            get { return NipkgConstants.PackageProviderName; }
         }
 
         /// <summary>
@@ -67,12 +65,7 @@ namespace PackageManagement
         /// <returns>The version of this provider </returns>
         public string ProviderVersion
         {
-            get { return "1.0.0.0"; }
-        }
-
-        private int ActivityID
-        {
-            get { return 0xEE; }
+            get { return NipkgConstants.ProviderVersion; }
         }
 
         /// <summary>
@@ -96,6 +89,7 @@ namespace PackageManagement
         public void InitializeProvider(Request request)
         {
             request.Debug("Calling '{0}::InitializeProvider'", PackageProviderName);
+
             try
             {
                 PackageManager = new PackageManager();
@@ -115,8 +109,8 @@ namespace PackageManagement
         /// <param name="attributeValue">The attribute value.</param>
         public void SetConfiguration(string attributeName, string attributeValue)
         {
-            ClientLibraryRequest request = PackageManager.SetConfiguration(attributeName, attributeValue);
-            request.WaitUntilRequestCompletes();
+            ClientLibraryRequest clientLibraryRequest = PackageManager.SetConfiguration(attributeName, attributeValue);
+            clientLibraryRequest.WaitUntilRequestCompletes();
         }
 
         /// <summary>
@@ -125,7 +119,6 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void GetFeatures(Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::GetFeatures' ", PackageProviderName);
 
             foreach (var feature in Features)
@@ -145,7 +138,6 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void GetDynamicOptions(string category, Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::GetDynamicOptions' {1}", PackageProviderName, category);
 
             switch ((category ?? string.Empty).ToLowerInvariant())
@@ -188,9 +180,16 @@ namespace PackageManagement
         {
             request.Debug("Calling '{0}::ResolvePackageSources'", PackageProviderName);
 
-            foreach (var source in GetSource(request.Sources.ToArray()))
+            try
             {
-                request.YieldPackageSource(source.Name.ToLower(), source.Uri, false, source.Enabled, false);
+                foreach (var source in GetSource(request.Sources.ToArray()))
+                {
+                    request.YieldPackageSource(source.Name.ToLower(), source.Uri, false, source.Enabled, false);
+                }
+            }
+            catch (NIPkgException e)
+            {
+                request.Debug(e.Message);
             }
         }
 
@@ -207,7 +206,15 @@ namespace PackageManagement
         {
             request.Debug("Entering {0} source add -n={1} -s'{2}' (we don't support trusted = '{3}')", PackageProviderName, name, location, trusted);
 
-            PackageManager.AddFeedConfiguration(location, name.ToLower());
+            try
+            {
+                ClientLibraryRequest clientLibraryRequest = PackageManager.AddFeedConfiguration(location, name.ToLower());
+                clientLibraryRequest.WaitUntilRequestCompletes();
+            }
+            catch (NIPkgException e)
+            {
+                request.Debug(e.Message);
+            }
         }
 
         /// <summary>
@@ -219,7 +226,15 @@ namespace PackageManagement
         {
             request.Debug("Entering {0} source remove -n={1})", PackageProviderName, name);
 
-            PackageManager.RemoveFeedConfiguration(name.ToLower());
+            try
+            {
+                ClientLibraryRequest clientLibraryRequest = PackageManager.RemoveFeedConfiguration(name.ToLower());
+                clientLibraryRequest.WaitUntilRequestCompletes();
+            }
+            catch (NIPkgException e)
+            {
+                request.Debug(e.Message);
+            }
         }
 
         /// <summary>
@@ -235,19 +250,24 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void FindPackage(string name, string requiredVersion, string minimumVersion, string maximumVersion, int id, Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::FindPackage' '{1}','{2}','{3}','{4}'", PackageProviderName, requiredVersion, minimumVersion, maximumVersion, id);
-
-            var sources = GetSource(request.Sources.ToArray()).Select(source => source.Name);
 
             var availablePackages = new List<PackageMetadata>();
             PackageManager.PackageMetadataAvailable += (sender, args) =>
             {
                 availablePackages.Add(args.PackageMetadata);
             };
-            ClientLibraryRequest clientLibraryRequest = PackageManager.GetAvailablePackages(sources);
-            clientLibraryRequest.WaitUntilRequestCompletes();
-            foreach (var package in availablePackages.Where(package => package.GetDisplayName(CultureInfo.CurrentCulture).ToLower() == name.ToLower() || name.Equals(string.Empty)))
+            try
+            {
+                var sources = GetSource(request.Sources.ToArray()).Select(source => source.Name);
+                ClientLibraryRequest clientLibraryRequest = PackageManager.GetAvailablePackages(sources);
+                clientLibraryRequest.WaitUntilRequestCompletes();
+            }
+            catch (NIPkgException e)
+            {
+                request.Debug(e.Message);
+            }
+            foreach (var package in availablePackages.Where(package => package.GetDisplayName(CultureInfo.CurrentCulture).ToLower() == name.ToLower() || package.PackageName.ToLower() == name.ToLower() || name.Equals(string.Empty)))
             {
                 request.YieldSoftwareIdentity(package);
             }
@@ -297,35 +317,36 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void DownloadPackage(string fastPackageReference, string location, Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::DownloadPackage' '{1}','{2}'", PackageProviderName, fastPackageReference, location);
-            var parts = fastPackageReference.Split(RequestHelper.NullChar);
-            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
+
+            var packageName = GetPackageNameFromFastPackageReference(fastPackageReference);
+            var childActivityID = request.StartProgress(NipkgConstants.ParentActivityID, packageName);
+            PackageManager.RequestMadeProgress += (sender, args) =>
+            {
+                request.Progress(childActivityID, (int)args.Progress.PercentageCompleted, NipkgConstants.DownloadText + packageName);
+                request.Debug(args.Progress.PercentageCompleted + string.Empty);
+            };
             try
             {
-                PackageManager.RequestMadeProgress += (sender, args) =>
-                {
-                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Downloading...");
-                };
-                ClientLibraryRequest clientLibraryRequest = PackageManager.DownloadPackage(
-                    new List<string>() { parts[0] },
-                    location);
+                ClientLibraryRequest clientLibraryRequest = PackageManager.DownloadPackage(new List<string>() { packageName }, location);
                 clientLibraryRequest.WaitUntilRequestCompletes();
-                request.CompleteProgress(activityID, true);
-                request.YieldSoftwareIdentity(
-                    fastPackageReference,
-                    parts[0],
-                    parts[1],
-                    "MultiPartNumeric",
-                    parts[2],
-                    "ni.com",
-                    parts[0], "", "");
             }
             catch (NIPkgException e)
             {
-                request.CompleteProgress(activityID, false);
+                request.CompleteProgress(childActivityID, false);
                 request.Debug(e.Message);
             }
+            request.CompleteProgress(childActivityID, true);
+            request.YieldSoftwareIdentity(
+                fastPackageReference,
+                packageName,
+                GetPackageVersionFromFastPackageReference(fastPackageReference),
+                NipkgConstants.VersionScheme,
+                GetPackageSummaryFromFastPackageReference(fastPackageReference),
+                NipkgConstants.PackageSource,
+                packageName/* useless */,
+                location,
+                packageName + NipkgConstants.NipkgFileExtension/* useless */);
         }
 
         /// <summary>
@@ -335,33 +356,43 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void InstallPackage(string fastPackageReference, Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::InstallPackage' '{1}'", PackageProviderName, fastPackageReference);
-            var parts = fastPackageReference.Split(RequestHelper.NullChar);
-            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
+
+            var packageName = GetPackageNameFromFastPackageReference(fastPackageReference);
+            string oldAction = string.Empty;
+            string currentAction = string.Empty;
+            int activityID = 0;
+            PackageManager.RequestMadeProgress += (sender, args) =>
+            {
+                currentAction = args.Progress.ActionCode.ToString();
+                if (currentAction != oldAction)
+                {
+                    request.CompleteProgress(activityID, true);
+                    activityID = request.StartProgress(NipkgConstants.ParentActivityID, NipkgConstants.InstallText + packageName);
+                    oldAction = currentAction;
+                }
+                request.Progress(activityID, (int)args.Progress.PercentageCompleted, currentAction + " " + args.Progress.Arg1);
+                request.Debug(args.Progress.PercentageCompleted + string.Empty);
+            };
             try
             {
-                PackageManager.RequestMadeProgress += (sender, args) =>
-                {
-                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Installing...");
-                };
-                ClientLibraryRequest clientLibraryRequest = PackageManager.InstallPackages(new List<string>() { parts[0] }, NIPkgTransactionFlag.AcceptLicenses);
+                ClientLibraryRequest clientLibraryRequest = PackageManager.InstallPackages(new List<string>() { packageName }, NIPkgTransactionFlag.AcceptLicenses);
                 clientLibraryRequest.WaitUntilRequestCompletes();
-                request.CompleteProgress(activityID, true);
-                request.YieldSoftwareIdentity(
-                    fastPackageReference,
-                    parts[0],
-                    parts[1],
-                    "MultiPartNumeric",
-                    parts[2],
-                    "ni.com",
-                    parts[0], "", "");
             }
             catch (NIPkgException e)
             {
-                request.CompleteProgress(activityID, false);
                 request.Debug(e.Message);
             }
+            request.YieldSoftwareIdentity(
+                fastPackageReference,
+                packageName,
+                GetPackageVersionFromFastPackageReference(fastPackageReference),
+                NipkgConstants.VersionScheme,
+                GetPackageSummaryFromFastPackageReference(fastPackageReference),
+                NipkgConstants.PackageSource,
+                packageName/* useless */,
+                string.Empty/* useless */,
+                packageName + NipkgConstants.NipkgFileExtension/* useless */);
         }
 
         /// <summary>
@@ -371,33 +402,46 @@ namespace PackageManagement
         /// <param name="request">An object passed in from the CORE that contains functions that can be used to interact with the CORE and HOST</param>
         public void UninstallPackage(string fastPackageReference, Request request)
         {
-            // Nice-to-have put a debug message in that tells what's going on.
             request.Debug("Calling '{0}::UninstallPackage' '{1}'", PackageProviderName, fastPackageReference);
-            var parts = fastPackageReference.Split(RequestHelper.NullChar);
-            var activityID = request.StartProgress(ActivityID, "NI Package Manager");
+
+            var packageName = GetPackageNameFromFastPackageReference(fastPackageReference);
+            string oldAction = string.Empty;
+            string currentAction = string.Empty;
+            int activityID = 0;
+            PackageManager.RequestMadeProgress += (sender, args) =>
+            {
+                currentAction = args.Progress.ActionCode.ToString();
+                if (currentAction != oldAction)
+                {
+                    if (activityID != 0)
+                    {
+                        request.CompleteProgress(activityID, true);
+                    }
+                    activityID = request.StartProgress(NipkgConstants.ParentActivityID, NipkgConstants.UninstallText + packageName);
+                    oldAction = currentAction;
+                }
+                request.Progress(activityID, (int)args.Progress.PercentageCompleted, currentAction + " " + args.Progress.Arg1);
+                request.Debug(args.Progress.PercentageCompleted + string.Empty);
+            };
             try
             {
-                PackageManager.RequestMadeProgress += (sender, args) =>
-                {
-                    request.Progress(activityID, (int)args.Progress.PercentageCompleted, "Uninstalling...");
-                };
-                ClientLibraryRequest clientLibraryRequest = PackageManager.RemovePackages(new List<string>() { parts[0] }, NIPkgTransactionFlag.AcceptLicenses);
+                ClientLibraryRequest clientLibraryRequest = PackageManager.RemovePackages(new List<string>() { packageName }, NIPkgTransactionFlag.AcceptLicenses);
                 clientLibraryRequest.WaitUntilRequestCompletes();
-                request.CompleteProgress(activityID, true);
-                request.YieldSoftwareIdentity(
-                    fastPackageReference,
-                    parts[0],
-                    parts[1],
-                    "MultiPartNumeric",
-                    parts[2],
-                    "ni.com",
-                    parts[0], "", "");
             }
             catch (NIPkgException e)
             {
-                request.CompleteProgress(activityID, false);
                 request.Debug(e.Message);
             }
+            request.YieldSoftwareIdentity(
+                fastPackageReference,
+                packageName,
+                GetPackageVersionFromFastPackageReference(fastPackageReference),
+                NipkgConstants.VersionScheme,
+                GetPackageSummaryFromFastPackageReference(fastPackageReference),
+                NipkgConstants.PackageSource,
+                packageName/* useless */,
+                string.Empty/* useless */,
+                packageName + NipkgConstants.NipkgFileExtension/* useless */);
         }
 
         /// <summary>
@@ -419,13 +463,20 @@ namespace PackageManagement
             var installedPackages = new List<PackageMetadata>();
             PackageManager.InstalledPackageMetadataAvailable += (sender, args) =>
             {
-                if (name == string.Empty || name == args.PackageMetadata.GetDisplayName(CultureInfo.CurrentCulture))
+                if (name == string.Empty || name == args.PackageMetadata.PackageName || name == args.PackageMetadata.GetDisplayName(CultureInfo.CurrentCulture))
                 {
                     installedPackages.Add(args.PackageMetadata);
                 }
             };
-            ClientLibraryRequest clientLibraryRequest = PackageManager.GetInstalledPackages();
-            clientLibraryRequest.WaitUntilRequestCompletes();
+            try
+            {
+                ClientLibraryRequest clientLibraryRequest = PackageManager.GetInstalledPackages();
+                clientLibraryRequest.WaitUntilRequestCompletes();
+            }
+            catch (NIPkgException e)
+            {
+                request.Debug(e.Message);
+            }
             foreach (var package in installedPackages)
             {
                 request.YieldSoftwareIdentity(package);
@@ -440,8 +491,10 @@ namespace PackageManagement
             {
                 all.Add(args.FeedConfiguration);
             };
+
             ClientLibraryRequest clientLibraryRequest = PackageManager.GetFeedConfigurations();
             clientLibraryRequest.WaitUntilRequestCompletes();
+
             if (names.Any())
             {
                 // the system is requesting sources that match the values passed.
@@ -459,6 +512,21 @@ namespace PackageManagement
                 sources = all;
             }
             return sources;
+        }
+
+        public string GetPackageNameFromFastPackageReference(string fastPackageReference)
+        {
+            return fastPackageReference.Split(RequestHelper.NullChar)[0];
+        }
+
+        public string GetPackageVersionFromFastPackageReference(string fastPackageReference)
+        {
+            return fastPackageReference.Split(RequestHelper.NullChar)[1];
+        }
+
+        public string GetPackageSummaryFromFastPackageReference(string fastPackageReference)
+        {
+            return fastPackageReference.Split(RequestHelper.NullChar)[2];
         }
 
         /*
